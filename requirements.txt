@@ -1,0 +1,21 @@
+# Duto — Passa Fácil · Dependências
+# Instale com: pip install -r requirements.txt
+
+# Interface
+streamlit>=1.35.0
+
+# Dados
+pandas>=2.0.0
+
+# Banco de dados e autenticação
+supabase>=2.4.0
+
+# Pagamento
+mercadopago>=2.2.0
+
+# Servidor webhook (deploy separado)
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+
+# Utils
+python-dotenv>=1.0.0
