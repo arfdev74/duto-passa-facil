@@ -1,37 +1,33 @@
 -- ╔══════════════════════════════════════════════════════════╗
--- ║  DUTO — PASSA FÁCIL · Schema do Banco de Dados           ║
--- ║  Execute este arquivo UMA VEZ no Supabase SQL Editor     ║
--- ║  Dashboard → SQL Editor → New Query → Cole e Execute     ║
+-- ║  DUTO — PASSA FÁCIL · Schema v2 (Licença Vitalícia)      ║
+-- ║  Execute no Supabase SQL Editor                          ║
 -- ╚══════════════════════════════════════════════════════════╝
 
 -- ─────────────────────────────────────────────────────────
 -- TABELA: profiles
--- Criada automaticamente após o primeiro login de cada usuário.
--- Espelha auth.users e adiciona dados de plano e cota.
 -- ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.profiles (
-    id                  UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    email               TEXT NOT NULL,
-    nome                TEXT,
-    plano               TEXT NOT NULL DEFAULT 'free'
-                            CHECK (plano IN ('free', 'profissional', 'empresarial')),
-    consultas_mes       INTEGER NOT NULL DEFAULT 0,
-    mes_referencia      TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM'),
-    mp_subscription_id  TEXT,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email             TEXT NOT NULL,
+    nome              TEXT,
+    plano             TEXT NOT NULL DEFAULT 'free'
+                          CHECK (plano IN ('free', 'profissional')),
+    consultas_mes     INTEGER NOT NULL DEFAULT 0,
+    mes_referencia    TEXT NOT NULL DEFAULT TO_CHAR(NOW(), 'YYYY-MM'),
+    mp_payment_id     TEXT,        -- ID do pagamento aprovado no MP
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ─────────────────────────────────────────────────────────
 -- TABELA: consultas
--- Histórico de dimensionamentos por usuário.
 -- ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.consultas (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    dados_entrada   JSONB NOT NULL,
-    resultado       JSONB NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    dados_entrada JSONB NOT NULL,
+    resultado     JSONB NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ─────────────────────────────────────────────────────────
@@ -43,36 +39,59 @@ CREATE INDEX IF NOT EXISTS idx_consultas_user_id
 CREATE INDEX IF NOT EXISTS idx_consultas_created_at
     ON public.consultas(created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_profiles_mp_subscription
-    ON public.profiles(mp_subscription_id)
-    WHERE mp_subscription_id IS NOT NULL;
+-- ─────────────────────────────────────────────────────────
+-- PERMISSÕES
+-- ─────────────────────────────────────────────────────────
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON public.profiles TO anon, authenticated, service_role;
+GRANT ALL ON public.consultas TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
 -- ─────────────────────────────────────────────────────────
--- ROW LEVEL SECURITY (RLS)
--- Cada usuário só vê e edita seus próprios dados.
+-- ROW LEVEL SECURITY
 -- ─────────────────────────────────────────────────────────
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.consultas ENABLE ROW LEVEL SECURITY;
 
--- Profiles: usuário vê e edita apenas o próprio perfil
+DROP POLICY IF EXISTS "profiles: próprio perfil" ON public.profiles;
 CREATE POLICY "profiles: próprio perfil"
-    ON public.profiles
-    FOR ALL
+    ON public.profiles FOR ALL
     USING (auth.uid() = id)
     WITH CHECK (auth.uid() = id);
 
--- Consultas: usuário vê e insere apenas as próprias consultas
+DROP POLICY IF EXISTS "consultas: próprias consultas" ON public.consultas;
 CREATE POLICY "consultas: próprias consultas"
-    ON public.consultas
-    FOR ALL
+    ON public.consultas FOR ALL
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
--- Service role bypassa RLS (usado no webhook_server para atualizar planos)
--- Isso é automático no Supabase com a service key — sem necessidade de policy extra.
+-- ─────────────────────────────────────────────────────────
+-- TRIGGER: cria perfil automaticamente após cadastro
+-- ─────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.profiles (id, email, nome, plano, consultas_mes, mes_referencia)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        COALESCE(NEW.raw_user_meta_data->>'nome', split_part(NEW.email, '@', 1)),
+        'free',
+        0,
+        TO_CHAR(NOW(), 'YYYY-MM')
+    )
+    ON CONFLICT (id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ─────────────────────────────────────────────────────────
--- TRIGGER: atualiza updated_at automaticamente
+-- TRIGGER: updated_at automático
 -- ─────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER AS $$
@@ -82,6 +101,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.profiles;
 CREATE TRIGGER trg_profiles_updated_at
     BEFORE UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();

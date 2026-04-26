@@ -1,9 +1,9 @@
 """
 database.py — Operações com o Supabase (PostgreSQL)
 
-Tabelas utilizadas:
-  • profiles   — dados do usuário, plano e cota mensal
-  • consultas  — histórico de dimensionamentos
+Tabelas:
+  • profiles  — dados do usuário e plano
+  • consultas — histórico de dimensionamentos
 """
 
 from __future__ import annotations
@@ -15,55 +15,48 @@ from supabase import create_client, Client
 from config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
 
 
-def get_client(access_token: str = "") -> Client:
+def get_client() -> Client:
     """
     Retorna cliente Supabase com service key.
-    Como o Streamlit roda no servidor (não no browser), usar a service key
-    é seguro — ela nunca é exposta ao usuário final.
-    A service key bypassa RLS, que é o comportamento correto para código server-side.
+    Streamlit roda server-side — a service key nunca é exposta ao usuário.
     """
-    url = SUPABASE_URL
     key = SUPABASE_SERVICE_KEY or SUPABASE_KEY
-    if not url or not key:
+    if not SUPABASE_URL or not key:
         raise RuntimeError(
-            "Variáveis SUPABASE_URL e SUPABASE_SERVICE_KEY não configuradas. "
-            "Verifique o arquivo .env"
+            "Variáveis SUPABASE_URL e SUPABASE_SERVICE_KEY não configuradas."
         )
-    return create_client(url, key)
+    return create_client(SUPABASE_URL, key)
 
 
 # ─────────────────────────────────────────────────────────
-# PERFIL DO USUÁRIO
+# PERFIL
 # ─────────────────────────────────────────────────────────
 
-def buscar_perfil(user_id: str, token: str = "") -> Optional[dict]:
+def buscar_perfil(user_id: str) -> Optional[dict]:
     """Retorna o perfil do usuário ou None se não existir."""
-    sb = get_client(token)
-    resp = sb.table("profiles").select("*").eq("id", user_id).single().execute()
-    return resp.data
+    try:
+        sb = get_client()
+        resp = sb.table("profiles").select("*").eq("id", user_id).single().execute()
+        return resp.data
+    except Exception:
+        return None
 
 
-def criar_perfil(user_id: str, email: str, nome: str = "", token: str = "") -> dict:
-    """Cria perfil inicial com plano Free."""
-    sb = get_client(token)
-    perfil = {
-        "id": user_id,
-        "email": email,
-        "nome": nome or email.split("@")[0],
-        "plano": "free",
-        "consultas_mes": 0,
-        "mes_referencia": _mes_atual(),
-        "mp_subscription_id": None,
-    }
-    resp = sb.table("profiles").insert(perfil).execute()
-    return resp.data[0]
-
-
-def garantir_perfil(user_id: str, email: str, token: str = "") -> dict:
-    """Busca ou cria perfil — use após login."""
-    perfil = buscar_perfil(user_id, token)
+def garantir_perfil(user_id: str, email: str) -> dict:
+    """Busca ou cria perfil — chamado após login."""
+    perfil = buscar_perfil(user_id)
     if not perfil:
-        perfil = criar_perfil(user_id, email, token=token)
+        sb = get_client()
+        perfil = {
+            "id": user_id,
+            "email": email,
+            "nome": email.split("@")[0],
+            "plano": "free",
+            "consultas_mes": 0,
+            "mes_referencia": _mes_atual(),
+        }
+        resp = sb.table("profiles").insert(perfil).execute()
+        return resp.data[0] if resp.data else perfil
     return perfil
 
 
@@ -73,16 +66,13 @@ def garantir_perfil(user_id: str, email: str, token: str = "") -> dict:
 
 def verificar_cota(perfil: dict, limite: int) -> tuple[bool, int, int]:
     """
-    Verifica se o usuário ainda tem cota disponível.
-
-    Returns:
-        (tem_cota, consultas_usadas, limite)
-        limite == -1 significa ilimitado
+    Verifica se o usuário tem cota disponível.
+    Returns: (tem_cota, usadas, limite) — limite -1 = ilimitado
     """
     if limite == -1:
-        return True, perfil["consultas_mes"], -1
+        return True, perfil.get("consultas_mes", 0), -1
 
-    # Reseta contador se mudou o mês
+    # Reseta se mudou o mês
     if perfil.get("mes_referencia") != _mes_atual():
         _resetar_contador(perfil["id"])
         return True, 0, limite
@@ -91,28 +81,28 @@ def verificar_cota(perfil: dict, limite: int) -> tuple[bool, int, int]:
     return usadas < limite, usadas, limite
 
 
-def incrementar_consulta(user_id: str, token: str = "") -> None:
+def incrementar_consulta(user_id: str) -> None:
     """Incrementa o contador de consultas do mês."""
-    sb = get_client(token)
-    # Busca valor atual para incrementar
+    sb = get_client()
     perfil = buscar_perfil(user_id)
-    mes = _mes_atual()
+    if not perfil:
+        return
 
+    mes = _mes_atual()
     if perfil.get("mes_referencia") != mes:
-        # Novo mês — zera e começa em 1
         sb.table("profiles").update({
             "consultas_mes": 1,
             "mes_referencia": mes,
         }).eq("id", user_id).execute()
     else:
-        novo_valor = (perfil.get("consultas_mes") or 0) + 1
+        novo = (perfil.get("consultas_mes") or 0) + 1
         sb.table("profiles").update({
-            "consultas_mes": novo_valor,
+            "consultas_mes": novo,
         }).eq("id", user_id).execute()
 
 
-def _resetar_contador(user_id: str, token: str = "") -> None:
-    sb = get_client(token)
+def _resetar_contador(user_id: str) -> None:
+    sb = get_client()
     sb.table("profiles").update({
         "consultas_mes": 0,
         "mes_referencia": _mes_atual(),
@@ -120,12 +110,28 @@ def _resetar_contador(user_id: str, token: str = "") -> None:
 
 
 # ─────────────────────────────────────────────────────────
-# HISTÓRICO DE CONSULTAS
+# ATIVAR LICENÇA PROFISSIONAL
 # ─────────────────────────────────────────────────────────
 
-def salvar_consulta(user_id: str, entrada: dict, resultado: dict, token: str = "") -> None:
-    """Persiste um dimensionamento no histórico."""
-    sb = get_client(token)
+def ativar_profissional(user_id: str, payment_id: str) -> None:
+    """
+    Ativa o plano Profissional vitalício após pagamento confirmado.
+    Uma vez ativado, nunca volta para Free automaticamente.
+    """
+    sb = get_client()
+    sb.table("profiles").update({
+        "plano": "profissional",
+        "mp_payment_id": payment_id,
+    }).eq("id", user_id).execute()
+
+
+# ─────────────────────────────────────────────────────────
+# HISTÓRICO
+# ─────────────────────────────────────────────────────────
+
+def salvar_consulta(user_id: str, entrada: dict, resultado: dict) -> None:
+    """Persiste um dimensionamento no histórico (plano Profissional)."""
+    sb = get_client()
     sb.table("consultas").insert({
         "user_id": user_id,
         "dados_entrada": json.dumps(entrada, ensure_ascii=False),
@@ -133,9 +139,9 @@ def salvar_consulta(user_id: str, entrada: dict, resultado: dict, token: str = "
     }).execute()
 
 
-def buscar_historico(user_id: str, limite: int = 20, token: str = "") -> list[dict]:
+def buscar_historico(user_id: str, limite: int = 20) -> list[dict]:
     """Retorna os últimos dimensionamentos do usuário."""
-    sb = get_client(token)
+    sb = get_client()
     resp = (
         sb.table("consultas")
         .select("*")
@@ -148,31 +154,8 @@ def buscar_historico(user_id: str, limite: int = 20, token: str = "") -> list[di
 
 
 # ─────────────────────────────────────────────────────────
-# ATUALIZAÇÃO DE PLANO (chamado pelo webhook do MP)
-# ─────────────────────────────────────────────────────────
-
-def atualizar_plano(user_id: str, novo_plano: str, mp_subscription_id: str) -> None:
-    """Eleva o plano do usuário após pagamento confirmado."""
-    sb = get_client()
-    sb.table("profiles").update({
-        "plano": novo_plano,
-        "mp_subscription_id": mp_subscription_id,
-    }).eq("id", user_id).execute()
-
-
-def rebaixar_para_free(mp_subscription_id: str) -> None:
-    """Volta para Free quando assinatura é cancelada/expirada."""
-    sb = get_client()
-    sb.table("profiles").update({
-        "plano": "free",
-        "mp_subscription_id": None,
-    }).eq("mp_subscription_id", mp_subscription_id).execute()
-
-
-# ─────────────────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────────────────
 
 def _mes_atual() -> str:
-    """Retorna 'YYYY-MM' do mês corrente."""
     return datetime.now().strftime("%Y-%m")

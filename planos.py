@@ -1,58 +1,57 @@
 """
-planos.py — Tela de planos, gate de cota e lógica de upgrade
-
-Responsável por:
-  • Mostrar os 3 planos com preços e benefícios
-  • Bloquear o acesso ao calculador quando a cota está esgotada
-  • Gerar o link de pagamento do Mercado Pago
+planos.py — Tela de upgrade e gate de cota
+Modelo: Free (3/mês) + Profissional (R$ 9,99 vitalício)
 """
 
 from __future__ import annotations
 import streamlit as st
 from config import PLANOS, Plano
 from database import verificar_cota
-from pagamento import criar_link_assinatura
+from pagamento import criar_link_pagamento
 
 
 # ─────────────────────────────────────────────────────────
-# VERIFICAÇÃO DE COTA (gate antes do cálculo)
+# GATE DE COTA
 # ─────────────────────────────────────────────────────────
 
 def gate_cota(perfil: dict) -> bool:
     """
     Retorna True se o usuário pode fazer uma consulta.
-    Se não pode, renderiza a tela de upgrade e retorna False.
+    Se não pode, mostra a tela de upgrade e retorna False.
     """
-    from config import PLANOS
     plano_obj: Plano = PLANOS[perfil.get("plano", "free")]
     tem_cota, usadas, limite = verificar_cota(perfil, plano_obj.consultas_mes)
 
     if tem_cota:
-        # Mostra badge de cota restante na sidebar
-        _badge_cota(usadas, limite, plano_obj.nome)
+        _badge_cota(usadas, limite, plano_obj)
         return True
 
-    # Sem cota → mostra tela de upgrade
-    render_tela_upgrade(perfil, usadas, limite, plano_obj)
+    render_tela_upgrade(perfil)
     return False
 
 
-def _badge_cota(usadas: int, limite: int, nome_plano: str) -> None:
+def _badge_cota(usadas: int, limite: int, plano: Plano) -> None:
     """Badge na sidebar mostrando uso do mês."""
     if limite == -1:
-        st.sidebar.caption(f"📊 Plano **{nome_plano}** · Ilimitado")
+        st.sidebar.markdown(
+            f'<div style="background:#152d1f;border:1px solid #27ae60;border-radius:6px;'
+            f'padding:0.6rem 0.8rem;margin-bottom:0.5rem;font-size:0.8rem;">'
+            f'🏆 Plano <strong style="color:#2ecc71">{plano.nome}</strong><br>'
+            f'<span style="color:#2ecc71;font-family:monospace;font-size:0.9rem">Ilimitado ∞</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
         return
 
     restantes = limite - usadas
     cor = "#2ecc71" if restantes > 0 else "#e74c3c"
     st.sidebar.markdown(
-        f'<div style="background:#1a1d26; border:1px solid #2a2d3a; '
-        f'border-radius:6px; padding:0.6rem 0.8rem; margin-bottom:0.5rem; '
-        f'font-size:0.8rem;">'
-        f'📊 Plano <strong>{nome_plano}</strong><br>'
-        f'<span style="color:{cor}; font-family:\'IBM Plex Mono\',monospace; '
-        f'font-size:1rem; font-weight:700">{restantes}</span>'
-        f'<span style="color:#888"> de {limite} consultas restantes este mês</span>'
+        f'<div style="background:#1a1d26;border:1px solid #2a2d3a;border-radius:6px;'
+        f'padding:0.6rem 0.8rem;margin-bottom:0.5rem;font-size:0.8rem;">'
+        f'📊 Plano <strong>{plano.nome}</strong><br>'
+        f'<span style="color:{cor};font-family:monospace;font-size:1rem;font-weight:700">'
+        f'{restantes}</span>'
+        f'<span style="color:#888"> de {limite} consultas restantes</span>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -62,205 +61,131 @@ def _badge_cota(usadas: int, limite: int, nome_plano: str) -> None:
 # TELA DE UPGRADE
 # ─────────────────────────────────────────────────────────
 
-def render_tela_upgrade(
-    perfil: dict,
-    usadas: int,
-    limite: int,
-    plano_atual: Plano,
-) -> None:
-    """Tela completa de upgrade quando a cota esgota."""
-
+def render_tela_upgrade(perfil: dict) -> None:
+    """Tela mostrada quando a cota Free esgota."""
     st.markdown("""
-    <div style="text-align:center; padding:2rem 0 1rem;">
+    <div style="text-align:center;padding:2rem 0 1.5rem">
         <div style="font-size:2.5rem">🔒</div>
-        <div style="font-family:'IBM Plex Mono',monospace; font-size:1.4rem;
-                    color:#00d4aa; font-weight:700; margin-top:0.5rem">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:1.4rem;
+                    color:#00d4aa;font-weight:700;margin-top:0.5rem">
             Cota do mês esgotada
         </div>
-        <div style="color:#888; font-size:0.9rem; margin-top:0.4rem">
-            Você usou todas as consultas do plano <strong style="color:#fff">
-            {plano}</strong> este mês.<br>Faça upgrade para continuar.
+        <div style="color:#888;font-size:0.9rem;margin-top:0.4rem">
+            Você usou os 3 dimensionamentos gratuitos deste mês.<br>
+            Desbloqueie o acesso ilimitado por apenas <strong style="color:#fff">R$ 9,99</strong> — para sempre.
         </div>
     </div>
-    """.format(plano=plano_atual.nome), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     render_cards_planos(perfil)
 
 
 def render_cards_planos(perfil: dict) -> None:
-    """Renderiza os 3 cards de plano lado a lado."""
-    _css_planos()
-
+    """Renderiza os 2 cards de plano lado a lado."""
     plano_atual_id = perfil.get("plano", "free")
-    cols = st.columns(3)
 
-    for col, (id_plano, plano) in zip(cols, PLANOS.items()):
-        with col:
-            _card_plano(perfil["id"], id_plano, plano, plano_atual_id)
+    col1, col2 = st.columns(2)
+
+    with col1:
+        _card_free(plano_atual_id)
+
+    with col2:
+        _card_profissional(perfil, plano_atual_id)
 
 
-def _card_plano(
-    user_id: str,
-    id_plano: str,
-    plano: Plano,
-    plano_atual_id: str,
-) -> None:
-    destaque = id_plano == "profissional"
-    atual = id_plano == plano_atual_id
+def _card_free(plano_atual_id: str) -> None:
+    atual = plano_atual_id == "free"
 
-    # Badge
-    if destaque:
-        st.markdown("⭐ **Mais popular**")
-    elif atual:
+    if atual:
         st.markdown("✔️ *Seu plano atual*")
     else:
         st.markdown("&nbsp;", unsafe_allow_html=True)
 
-    # Nome
-    st.markdown(f"### {plano.nome}")
-
-    # Preço
-    if plano.preco_brl == 0:
-        st.markdown(
-            '<span style="color:#2ecc71;font-size:1.6rem;font-weight:700;'
-            'font-family:monospace">Grátis</span>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            f'<span style="color:#00d4aa;font-size:1.5rem;font-weight:700;'
-            f'font-family:monospace">R$ {plano.preco_brl:.2f}</span>'
-            f'<span style="color:#888;font-size:0.85rem"> /mês</span>',
-            unsafe_allow_html=True,
-        )
-
-    st.caption(plano.descricao)
+    st.markdown("### Free")
+    st.markdown(
+        '<span style="color:#2ecc71;font-size:1.5rem;font-weight:700;'
+        'font-family:monospace">Grátis</span>',
+        unsafe_allow_html=True,
+    )
+    st.caption("3 dimensionamentos por mês. Ideal para conhecer a ferramenta.")
     st.divider()
 
-    # Features
     features = [
-        (True, f"{'Ilimitadas' if plano.consultas_mes == -1 else plano.consultas_mes} consultas/mês"),
-        (plano.historico, "Histórico de projetos"),
-        (plano.exportar_pdf, "Exportação em PDF"),
-        (plano.multiusuario, "Multi-usuário"),
-        (plano.logo_personalizada, "Logo da empresa no PDF"),
+        (True,  "3 consultas por mês"),
+        (False, "Histórico de projetos"),
+        (False, "Acesso ilimitado"),
     ]
     for ok, txt in features:
-        icone = "✅" if ok else "❌"
         cor = "#ddd" if ok else "#555"
+        icone = "✅" if ok else "❌"
         st.markdown(
             f'<div style="color:{cor};font-size:0.85rem;padding:2px 0">{icone} {txt}</div>',
             unsafe_allow_html=True,
         )
 
     st.write("")
+    st.button("Plano atual", disabled=True, key="btn_free", use_container_width=True)
 
-    # ── Botão de ação ──
+
+def _card_profissional(perfil: dict, plano_atual_id: str) -> None:
+    atual = plano_atual_id == "profissional"
+
+    st.markdown("⭐ **Recomendado**")
+    st.markdown("### Profissional")
+    st.markdown(
+        '<span style="color:#00d4aa;font-size:1.5rem;font-weight:700;'
+        'font-family:monospace">R$ 9,99</span>'
+        '<span style="color:#888;font-size:0.85rem"> único · vitalício</span>',
+        unsafe_allow_html=True,
+    )
+    st.caption("Pague uma vez, use para sempre. Sem mensalidade.")
+    st.divider()
+
+    features = [
+        (True, "Consultas ilimitadas"),
+        (True, "Histórico de projetos"),
+        (True, "Acesso vitalício"),
+    ]
+    for ok, txt in features:
+        st.markdown(
+            f'<div style="color:#ddd;font-size:0.85rem;padding:2px 0">✅ {txt}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+
     if atual:
-        st.button("Plano atual", disabled=True, key=f"btn_{id_plano}", use_container_width=True)
-    elif id_plano == "free":
-        st.info("Aguarde o próximo mês para novas consultas gratuitas.")
+        st.button(
+            "✅ Licença ativa",
+            disabled=True,
+            key="btn_prof",
+            use_container_width=True,
+        )
     else:
         if st.button(
-            f"Assinar por R$ {plano.preco_brl:.2f}/mês",
-            key=f"btn_{id_plano}",
+            "Comprar por R$ 9,99",
+            key="btn_prof",
             use_container_width=True,
             type="primary",
         ):
             with st.spinner("Gerando link de pagamento..."):
-                usuario = st.session_state.get("usuario", {})
-                email = usuario.get("email", "")
-                _iniciar_checkout(user_id, id_plano, email)
+                _iniciar_checkout(perfil)
 
 
-def _iniciar_checkout(user_id: str, id_plano: str, payer_email: str = "") -> None:
+def _iniciar_checkout(perfil: dict) -> None:
     """Gera o link do Mercado Pago e redireciona."""
     try:
-        url = criar_link_assinatura(user_id, id_plano, payer_email)
-        # Abre em nova aba via JS
+        url = criar_link_pagamento(
+            user_id=perfil["id"],
+            user_email=perfil["email"],
+        )
         st.markdown(
             f'<meta http-equiv="refresh" content="0; url={url}">',
             unsafe_allow_html=True,
         )
         st.success(
             f"Redirecionando para o pagamento... "
-            f"[Clique aqui se não redirecionar automaticamente]({url})"
+            f"[Clique aqui se não redirecionar]({url})"
         )
     except Exception as e:
         st.error(f"Erro ao gerar link de pagamento: {e}")
-
-
-# ─────────────────────────────────────────────────────────
-# CSS DOS CARDS
-# ─────────────────────────────────────────────────────────
-
-def _css_planos() -> None:
-    st.markdown("""
-    <style>
-        .card-plano {
-            background: #1a1d26;
-            border: 1px solid #2a2d3a;
-            border-radius: 10px;
-            padding: 1.25rem;
-            min-height: 360px;
-            position: relative;
-        }
-        .badge-destaque {
-            background: #00d4aa;
-            color: #0f1117;
-            font-size: 0.7rem;
-            font-weight: 700;
-            padding: 0.2rem 0.6rem;
-            border-radius: 20px;
-            display: inline-block;
-            margin-bottom: 0.75rem;
-            font-family: 'IBM Plex Mono', monospace;
-        }
-        .badge-atual {
-            background: #2a3a2a;
-            color: #2ecc71;
-            font-size: 0.7rem;
-            padding: 0.2rem 0.6rem;
-            border-radius: 20px;
-            display: inline-block;
-            margin-bottom: 0.75rem;
-        }
-        .plano-nome {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #fff;
-            margin-bottom: 0.5rem;
-        }
-        .preco-gratis {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: #2ecc71;
-        }
-        .preco-valor {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: #00d4aa;
-        }
-        .preco-periodo {
-            color: #888;
-            font-size: 0.85rem;
-        }
-        .plano-desc {
-            color: #888;
-            font-size: 0.8rem;
-            margin-top: 0.5rem;
-            line-height: 1.4;
-        }
-        .feature {
-            font-size: 0.82rem;
-            padding: 0.2rem 0;
-            color: #ccc;
-        }
-        .feature.off {
-            color: #555;
-        }
-    </style>
-    """, unsafe_allow_html=True)
