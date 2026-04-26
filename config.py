@@ -9,19 +9,39 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _get(key: str, default: str = "") -> str:
+    """
+    Lê variável de ambiente com fallback para st.secrets.
+    - Localmente: usa o arquivo .env via os.getenv()
+    - Streamlit Cloud: usa st.secrets (TOML no painel)
+    """
+    # Tenta os.getenv primeiro (local / Railway)
+    valor = os.getenv(key, "")
+    if valor:
+        return valor.strip()
+
+    # Fallback para st.secrets (Streamlit Cloud)
+    try:
+        import streamlit as st
+        return str(st.secrets.get(key, default)).strip()
+    except Exception:
+        return default
+
+
 # ─────────────────────────────────────────────────────────
 # SUPABASE
 # ─────────────────────────────────────────────────────────
-SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
-SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+SUPABASE_URL: str = _get("SUPABASE_URL")
+SUPABASE_KEY: str = _get("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_KEY: str = _get("SUPABASE_SERVICE_KEY")
 
 # ─────────────────────────────────────────────────────────
 # MERCADO PAGO
 # ─────────────────────────────────────────────────────────
-MP_ACCESS_TOKEN: str = os.getenv("MP_ACCESS_TOKEN", "")
-MP_WEBHOOK_SECRET: str = os.getenv("MP_WEBHOOK_SECRET", "")
-APP_BASE_URL: str = os.getenv("APP_BASE_URL", "http://localhost:8501")
+MP_ACCESS_TOKEN: str = _get("MP_ACCESS_TOKEN")
+MP_WEBHOOK_SECRET: str = _get("MP_WEBHOOK_SECRET")
+APP_BASE_URL: str = _get("APP_BASE_URL", "http://localhost:8501")
 
 # ─────────────────────────────────────────────────────────
 # PLANOS
