@@ -108,26 +108,36 @@ def _card_plano(
     destaque = id_plano == "profissional"
     atual = id_plano == plano_atual_id
 
-    borda = "#00d4aa" if destaque else "#2a2d3a"
-    badge_html = (
-        '<div class="badge-destaque">⭐ Mais popular</div>' if destaque else ""
-    )
-    badge_atual = (
-        '<div class="badge-atual">Seu plano atual</div>' if atual else ""
-    )
+    # Badge
+    if destaque:
+        st.markdown("⭐ **Mais popular**")
+    elif atual:
+        st.markdown("✔️ *Seu plano atual*")
+    else:
+        st.markdown("&nbsp;", unsafe_allow_html=True)
 
-    preco_html = (
-        '<span class="preco-gratis">Grátis</span>'
-        if plano.preco_brl == 0
-        else f'<span class="preco-valor">R$ {plano.preco_brl:.2f}</span>'
-             f'<span class="preco-periodo">/mês</span>'
-    )
+    # Nome
+    st.markdown(f"### {plano.nome}")
 
-    consultas_txt = (
-        "Ilimitado" if plano.consultas_mes == -1
-        else f"{plano.consultas_mes}/mês"
-    )
+    # Preço
+    if plano.preco_brl == 0:
+        st.markdown(
+            '<span style="color:#2ecc71;font-size:1.6rem;font-weight:700;'
+            'font-family:monospace">Grátis</span>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f'<span style="color:#00d4aa;font-size:1.5rem;font-weight:700;'
+            f'font-family:monospace">R$ {plano.preco_brl:.2f}</span>'
+            f'<span style="color:#888;font-size:0.85rem"> /mês</span>',
+            unsafe_allow_html=True,
+        )
 
+    st.caption(plano.descricao)
+    st.divider()
+
+    # Features
     features = [
         (True, f"{'Ilimitadas' if plano.consultas_mes == -1 else plano.consultas_mes} consultas/mês"),
         (plano.historico, "Histórico de projetos"),
@@ -135,28 +145,17 @@ def _card_plano(
         (plano.multiusuario, "Multi-usuário"),
         (plano.logo_personalizada, "Logo da empresa no PDF"),
     ]
+    for ok, txt in features:
+        icone = "✅" if ok else "❌"
+        cor = "#ddd" if ok else "#555"
+        st.markdown(
+            f'<div style="color:{cor};font-size:0.85rem;padding:2px 0">{icone} {txt}</div>',
+            unsafe_allow_html=True,
+        )
 
-    features_html = "".join(
-        f'<div class="feature {"on" if ok else "off"}">'
-        f'{"✅" if ok else "❌"} {txt}</div>'
-        for ok, txt in features
-    )
+    st.write("")
 
-    st.markdown(
-        f"""
-        <div class="card-plano" style="border-color:{borda}">
-            {badge_html}{badge_atual}
-            <div class="plano-nome">{plano.nome}</div>
-            <div class="plano-preco">{preco_html}</div>
-            <div class="plano-desc">{plano.descricao}</div>
-            <hr style="border-color:#2a2d3a; margin:0.75rem 0">
-            {features_html}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # Botão de ação
+    # ── Botão de ação ──
     if atual:
         st.button("Plano atual", disabled=True, key=f"btn_{id_plano}", use_container_width=True)
     elif id_plano == "free":
@@ -166,15 +165,18 @@ def _card_plano(
             f"Assinar por R$ {plano.preco_brl:.2f}/mês",
             key=f"btn_{id_plano}",
             use_container_width=True,
+            type="primary",
         ):
             with st.spinner("Gerando link de pagamento..."):
-                _iniciar_checkout(user_id, id_plano)
+                usuario = st.session_state.get("usuario", {})
+                email = usuario.get("email", "")
+                _iniciar_checkout(user_id, id_plano, email)
 
 
-def _iniciar_checkout(user_id: str, id_plano: str) -> None:
+def _iniciar_checkout(user_id: str, id_plano: str, payer_email: str = "") -> None:
     """Gera o link do Mercado Pago e redireciona."""
     try:
-        url = criar_link_assinatura(user_id, id_plano)
+        url = criar_link_assinatura(user_id, id_plano, payer_email)
         # Abre em nova aba via JS
         st.markdown(
             f'<meta http-equiv="refresh" content="0; url={url}">',

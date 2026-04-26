@@ -8,7 +8,6 @@ from __future__ import annotations
 import streamlit as st
 from supabase import create_client, Client
 from config import SUPABASE_URL, SUPABASE_KEY
-from database import garantir_perfil
 
 
 def _sb() -> Client:
@@ -45,14 +44,25 @@ def carregar_sessao_do_query() -> None:
 
 
 def _salvar_usuario_na_sessao(user) -> dict:
-    """Salva dados do usuário no session_state e garante perfil no banco."""
-    perfil = garantir_perfil(user.id, user.email)
-    st.session_state["usuario"] = {
+    """
+    Salva dados do usuário no session_state.
+    O perfil é criado automaticamente pelo trigger no banco (SECURITY DEFINER).
+    Aqui apenas construímos o dict de sessão com valores padrão.
+    O app.py recarrega o perfil real do banco a cada tela.
+    """
+    import datetime
+    meta = getattr(user, "user_metadata", {}) or {}
+    perfil_padrao = {
         "id": user.id,
         "email": user.email,
-        **perfil,
+        "nome": meta.get("nome", user.email.split("@")[0]),
+        "plano": "free",
+        "consultas_mes": 0,
+        "mes_referencia": datetime.datetime.now().strftime("%Y-%m"),
+        "mp_subscription_id": None,
     }
-    return st.session_state["usuario"]
+    st.session_state["usuario"] = perfil_padrao
+    return perfil_padrao
 
 
 def logout() -> None:
@@ -148,6 +158,9 @@ def _fazer_login(email: str, senha: str) -> None:
     try:
         sb = _sb()
         resp = sb.auth.sign_in_with_password({"email": email, "password": senha})
+        # Armazena o token JWT — usado nas queries autenticadas (RLS)
+        if resp.session:
+            st.session_state["access_token"] = resp.session.access_token
         _salvar_usuario_na_sessao(resp.user)
         st.rerun()
     except Exception as e:
@@ -172,6 +185,7 @@ def _fazer_cadastro(nome: str, email: str, senha: str) -> None:
         if resp.user:
             # Supabase pode exigir confirmação de e-mail
             if resp.session:
+                st.session_state["access_token"] = resp.session.access_token
                 _salvar_usuario_na_sessao(resp.user)
                 st.rerun()
             else:

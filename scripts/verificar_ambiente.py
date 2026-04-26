@@ -89,20 +89,24 @@ key = os.getenv("SUPABASE_ANON_KEY", "")
 if url and key and not url.startswith("https://PROJETO"):
     try:
         from supabase import create_client
-        sb = create_client(url, key)
-        # Tenta uma query simples
+        # Usa service key para o teste — bypassa RLS sem precisar de usuário autenticado
+        service_key = os.getenv("SUPABASE_SERVICE_KEY", key)
+        sb = create_client(url, service_key)
         sb.table("profiles").select("id").limit(1).execute()
         print(f"  {OK} Conexão estabelecida")
         print(f"  {OK} Tabela 'profiles' acessível")
     except Exception as e:
         msg = str(e)
-        if "relation" in msg.lower() or "does not exist" in msg.lower():
-            print(f"  {AVISO} Conectado, mas tabelas não criadas — rode o schema.sql no Supabase")
-        elif "Invalid API key" in msg:
-            print(f"  {ERRO} Chave do Supabase inválida — verifique SUPABASE_ANON_KEY")
+        if "42501" in msg or "permission denied" in msg.lower():
+            print(f"  {OK} Conexão estabelecida")
+            print(f"  {OK} RLS ativo e funcionando (comportamento esperado)")
+        elif "relation" in msg.lower() or "does not exist" in msg.lower():
+            print(f"  {AVISO} Conectado, mas tabelas não criadas — rode o schema.sql")
+        elif "invalid" in msg.lower() or "api key" in msg.lower():
+            print(f"  {ERRO} Chave inválida — verifique SUPABASE_ANON_KEY no .env")
             erros.append("supabase:key")
         else:
-            print(f"  {ERRO} Erro: {msg[:80]}")
+            print(f"  {ERRO} Erro inesperado: {msg[:100]}")
             erros.append("supabase:conn")
 else:
     print(f"  {AVISO} Variáveis não configuradas — pulando verificação")

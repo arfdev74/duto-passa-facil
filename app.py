@@ -437,7 +437,8 @@ def render_historico(user_id: str) -> None:
     import json
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-titulo">📁 Histórico de Projetos</div>', unsafe_allow_html=True)
-    registros = buscar_historico(user_id)
+    token = st.session_state.get("access_token", "")
+    registros = buscar_historico(user_id, token=token)
     if not registros:
         st.caption("Nenhum dimensionamento salvo ainda.")
     else:
@@ -474,7 +475,8 @@ def main():
         return
 
     # ── Logado: atualiza perfil do banco (plano pode ter mudado via webhook) ──
-    perfil_atualizado = buscar_perfil(usuario["id"]) or usuario
+    token = st.session_state.get("access_token", "")
+    perfil_atualizado = buscar_perfil(usuario["id"], token) or usuario
     st.session_state["usuario"].update(perfil_atualizado)
     usuario = st.session_state["usuario"]
 
@@ -569,11 +571,11 @@ def main():
                 "fator_agrupamento": fator_agrupamento_valor(num_circ),
             }
 
-            incrementar_consulta(usuario["id"])
+            incrementar_consulta(usuario["id"], token)
 
             # Salva histórico apenas para planos pagos
             if plano_obj.historico:
-                salvar_consulta(usuario["id"], entrada_json, resultado_json)
+                salvar_consulta(usuario["id"], entrada_json, resultado_json, token)
 
             st.sidebar.success("✅ Cálculo registrado!")
 

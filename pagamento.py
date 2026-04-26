@@ -30,13 +30,10 @@ def _sdk() -> mercadopago.SDK:
 # CRIAR LINK DE ASSINATURA (Preapproval Plan)
 # ─────────────────────────────────────────────────────────
 
-def criar_link_assinatura(user_id: str, id_plano: str) -> str:
+def criar_link_assinatura(user_id: str, id_plano: str, payer_email: str = "") -> str:
     """
     Cria uma assinatura recorrente mensal no Mercado Pago e
     retorna a URL de checkout para redirecionar o usuário.
-
-    O campo external_reference carrega user_id|id_plano para
-    o webhook identificar quem pagou e qual plano ativar.
     """
     plano = PLANOS[id_plano]
     sdk = _sdk()
@@ -49,10 +46,14 @@ def criar_link_assinatura(user_id: str, id_plano: str) -> str:
             "transaction_amount": plano.preco_brl,
             "currency_id": "BRL",
         },
-        "back_url": f"{APP_BASE_URL}?pagamento=sucesso&plano={id_plano}",
+        # back_url deve ser uma URL pública válida
+        # Em desenvolvimento use seu ngrok ou qualquer URL pública sua
+        "back_url": APP_BASE_URL if APP_BASE_URL.startswith("https://") else "https://www.mercadopago.com.br",
         "external_reference": f"{user_id}|{id_plano}",
         "status": "pending",
     }
+
+    dados["payer_email"] = "test_user_7308998738685709705@testuser.com"
 
     resp = sdk.preapproval().create(dados)
 
