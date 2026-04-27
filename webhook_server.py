@@ -1,22 +1,20 @@
 """
 webhook_server.py — Servidor FastAPI para callbacks do Mercado Pago
-Modelo: Pagamento único — só trata aprovação, sem cancelamento recorrente.
-
-Deploy separado (Railway.app — gratuito):
-    uvicorn webhook_server:app --host 0.0.0.0 --port 8000
-
-URL a configurar no painel do Mercado Pago:
-    https://SEU-DOMINIO.railway.app/webhook/mercadopago
 """
 
-from fastapi import FastAPI, Request, HTTPException, Header
-from supabase import create_client
-
+from fastapi import FastAPI, Request, Header
 from config import SUPABASE_URL, SUPABASE_SERVICE_KEY
-from pagamento import validar_assinatura_webhook, processar_evento_mp
+from pagamento import validar_assinatura_webhook
 from database import ativar_profissional
+import mercadopago
+import os
 
 app = FastAPI(title="Duto Passa Fácil — Webhook")
+
+
+def _sdk():
+    from config import MP_ACCESS_TOKEN
+    return mercadopago.SDK(MP_ACCESS_TOKEN)
 
 
 @app.get("/health")
@@ -31,23 +29,46 @@ async def webhook_mp(
 ):
     """
     Recebe notificações do Mercado Pago.
-    Quando pagamento é aprovado → ativa licença Profissional vitalícia.
+    O MP envia o payment_id como query param: ?data.id=XXX&type=payment
     """
-    payload_bytes = await request.body()
-    payload = await request.json()
+    # Pega query params
+    params = dict(request.query_params)
+    payment_id = params.get("data.id", "")
+    tipo = params.get("type", "")
 
-    # 1. Valida autenticidade
-    if not validar_assinatura_webhook(payload_bytes, x_signature):
-        raise HTTPException(status_code=401, detail="Assinatura inválida")
+    # Também tenta ler do body JSON (simulação e outros formatos)
+    try:
+        body = await request.json()
+        if not payment_id:
+            payment_id = str(body.get("data", {}).get("id", ""))
+        if not tipo:
+            tipo = body.get("type", "")
+    except Exception:
+        pass
 
-    # 2. Processa evento — retorna user_id se aprovado
-    user_id = processar_evento_mp(payload)
+    print(f"Webhook recebido — tipo: {tipo}, payment_id: {payment_id}")
 
-    if user_id:
-        payment_id = str(payload.get("data", {}).get("id", ""))
-        ativar_profissional(user_id, payment_id)
-        print(f"✅ Licença Profissional ativada — usuário {user_id[:8]}...")
-        return {"status": "ok", "acao": "licenca_ativada"}
+    if tipo != "payment" or not payment_id:
+        print(f"Evento ignorado — tipo: {tipo}, payment_id: {payment_id}")
+        return {"status": "ok", "acao": "ignorado"}
 
-    # Evento irrelevante (tentativas, estornos futuros, etc.)
-    return {"status": "ok", "acao": "ignorado"}
+    # Busca dados do pagamento no MP
+    try:
+        sdk = _sdk()
+        payment = sdk.payment().get(payment_id)["response"]
+        status = payment.get("status", "")
+        user_id = payment.get("external_reference", "")
+
+        print(f"Pagamento {payment_id} — status: {status}, user_id: {user_id}")
+
+        if status == "approved" and user_id:
+            ativar_profissional(user_id, payment_id)
+            print(f"✅ Licença Profissional ativada — usuário {user_id[:8]}...")
+            return {"status": "ok", "acao": "licenca_ativada"}
+        else:
+            print(f"Pagamento não aprovado ou sem user_id — status: {status}")
+            return {"status": "ok", "acao": "ignorado"}
+
+    except Exception as e:
+        print(f"Erro ao processar pagamento {payment_id}: {e}")
+        return {"status": "ok", "acao": "erro", "detail": str(e)}
