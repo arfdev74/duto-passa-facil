@@ -438,8 +438,7 @@ def render_historico(user_id: str) -> None:
     import json
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-titulo">📁 Histórico de Projetos</div>', unsafe_allow_html=True)
-    token = st.session_state.get("access_token", "")
-    registros = buscar_historico(user_id, token=token)
+    registros = buscar_historico(user_id)
     if not registros:
         st.caption("Nenhum dimensionamento salvo ainda.")
     else:
