@@ -477,7 +477,6 @@ def main():
         return
 
     # ── Logado: atualiza perfil do banco (plano pode ter mudado via webhook) ──
-    token = st.session_state.get("access_token", "")
     perfil_atualizado = buscar_perfil(usuario["id"]) or usuario
     st.session_state["usuario"].update(perfil_atualizado)
     usuario = st.session_state["usuario"]
@@ -573,11 +572,11 @@ def main():
                 "fator_agrupamento": fator_agrupamento_valor(num_circ),
             }
 
-            incrementar_consulta(usuario["id"], token)
+            incrementar_consulta(usuario["id"])
 
             # Salva histórico apenas para planos pagos
             if plano_obj.historico:
-                salvar_consulta(usuario["id"], entrada_json, resultado_json, token)
+                salvar_consulta(usuario["id"], entrada_json, resultado_json)
 
             st.sidebar.success("✅ Cálculo registrado!")
 
