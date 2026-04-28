@@ -478,7 +478,7 @@ def main():
 
     # ── Logado: atualiza perfil do banco (plano pode ter mudado via webhook) ──
     token = st.session_state.get("access_token", "")
-    perfil_atualizado = buscar_perfil(usuario["id"], token) or usuario
+    perfil_atualizado = buscar_perfil(usuario["id"]) or usuario
     st.session_state["usuario"].update(perfil_atualizado)
     usuario = st.session_state["usuario"]
 
