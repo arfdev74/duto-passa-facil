@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500" role="img">
+  <title>Banner Play Store — Duto Passa Fácil</title>
+  <desc>Banner horizontal do app Duto Passa Fácil para a Play Store</desc>
+
+  <rect x="0" y="0" width="1024" height="500" fill="#0d1b2a"/>
+  <rect x="580" y="0" width="444" height="500" fill="#0f2236"/>
+  <rect x="578" y="40" width="3" height="420" rx="1" fill="#f57c20" opacity="0.4"/>
+
+  <rect x="0" y="148" width="560" height="88" rx="8" fill="#1e3a52"/>
+  <rect x="0" y="148" width="560" height="22" rx="8" fill="#2a5070" opacity="0.6"/>
+
+  <rect x="0" y="163" width="570" height="14" rx="7" fill="#f57c20"/>
+  <rect x="0" y="163" width="570" height="5" rx="7" fill="#ff9a45" opacity="0.5"/>
+  <rect x="0" y="183" width="570" height="13" rx="6" fill="#c45f10"/>
+  <rect x="0" y="202" width="570" height="13" rx="6" fill="#4a90b8"/>
+  <rect x="0" y="202" width="570" height="4" rx="6" fill="#7ab8d4" opacity="0.5"/>
+
+  <circle cx="562" cy="170" r="8" fill="#f57c20"/>
+  <circle cx="562" cy="170" r="3" fill="#0d1b2a"/>
+  <circle cx="562" cy="189" r="7" fill="#c45f10"/>
+  <circle cx="562" cy="189" r="2.5" fill="#0d1b2a"/>
+  <circle cx="562" cy="208" r="7" fill="#4a90b8"/>
+  <circle cx="562" cy="208" r="2.5" fill="#0d1b2a"/>
+
+  <rect x="48" y="56" width="88" height="88" rx="16" fill="#162840"/>
+  <rect x="48" y="56" width="88" height="88" rx="16" fill="none" stroke="#f57c20" stroke-width="2" opacity="0.4"/>
+  <rect x="58" y="78" width="68" height="18" rx="3" fill="#1e3a52"/>
+  <rect x="52" y="82" width="80" height="4" rx="2" fill="#f57c20"/>
+  <rect x="52" y="89" width="80" height="3" rx="2" fill="#c45f10"/>
+  <rect x="52" y="95" width="80" height="3" rx="2" fill="#4a90b8"/>
+  <text x="92" y="122" text-anchor="middle" font-family="'IBM Plex Mono', monospace" fill="#ffffff" font-weight="700" font-size="13">DUTO</text>
+  <rect x="62" y="124" width="60" height="2" rx="1" fill="#f57c20"/>
+  <text x="92" y="136" text-anchor="middle" font-family="'IBM Plex Mono', monospace" fill="#f57c20" font-size="9">Passa Fácil</text>
+
+  <text x="48" y="295" font-family="'IBM Plex Mono', 'Courier New', monospace" fill="#ffffff" font-weight="700" font-size="52">DUTO</text>
+  <rect x="48" y="308" width="200" height="4" rx="2" fill="#f57c20"/>
+  <text x="48" y="348" font-family="'IBM Plex Mono', 'Courier New', monospace" fill="#f57c20" font-weight="400" font-size="28">Passa Fácil</text>
+  <text x="48" y="382" font-family="'IBM Plex Mono', 'Courier New', monospace" fill="#2a5070" font-size="16">NBR 5410 · NBR 5597 · NBR 6150</text>
+
+  <rect x="620" y="60" width="6" height="6" rx="1" fill="#f57c20"/>
+  <text x="640" y="70" font-family="'IBM Plex Sans', sans-serif" fill="#ffffff" font-size="18" font-weight="600">Dimensionamento automático</text>
+  <text x="640" y="90" font-family="'IBM Plex Sans', sans-serif" fill="#4a7090" font-size="14">Taxa de ocupação 53% · 31% · 40%</text>
+
+  <rect x="620" y="130" width="6" height="6" rx="1" fill="#f57c20"/>
+  <text x="640" y="140" font-family="'IBM Plex Sans', sans-serif" fill="#ffffff" font-size="18" font-weight="600">Fator de agrupamento</text>
+  <text x="640" y="160" font-family="'IBM Plex Sans', sans-serif" fill="#4a7090" font-size="14">Tabela 42 da NBR 5410</text>
+
+  <rect x="620" y="200" width="6" height="6" rx="1" fill="#f57c20"/>
+  <text x="640" y="210" font-family="'IBM Plex Sans', sans-serif" fill="#ffffff" font-size="18" font-weight="600">Alerta de segregação EMI</text>
+  <text x="640" y="230" font-family="'IBM Plex Sans', sans-serif" fill="#4a7090" font-size="14">Potência · Dados · Controle</text>
+
+  <rect x="620" y="270" width="6" height="6" rx="1" fill="#f57c20"/>
+  <text x="640" y="280" font-family="'IBM Plex Sans', sans-serif" fill="#ffffff" font-size="18" font-weight="600">Metálico e PVC</text>
+  <text x="640" y="300" font-family="'IBM Plex Sans', sans-serif" fill="#4a7090" font-size="14">NBR 5597 · NBR 6150</text>
+
+  <rect x="620" y="350" width="200" height="52" rx="8" fill="#f57c20"/>
+  <text x="720" y="370" text-anchor="middle" font-family="'IBM Plex Mono', monospace" fill="#0d1b2a" font-size="11" font-weight="700">LICENÇA VITALÍCIA</text>
+  <text x="720" y="392" text-anchor="middle" font-family="'IBM Plex Mono', monospace" fill="#0d1b2a" font-size="22" font-weight="700">R$ 9,99</text>
+
+  <text x="620" y="450" font-family="'IBM Plex Mono', monospace" fill="#1e3a52" font-size="13">apps-tools.com.br/duto-passa-facil</text>
+
+  <rect x="0" y="468" width="1024" height="3" fill="#f57c20" opacity="0.3"/>
+  <rect x="0" y="468" width="200" height="3" fill="#f57c20"/>
+</svg>
